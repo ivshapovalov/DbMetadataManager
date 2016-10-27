@@ -15,9 +15,12 @@ import static com.juja.pairs.DbMetadataManager.logAppender;
 
 public class MySQLMetadataReader extends SQLMetadataReader {
     private final static Logger logger = Logger.getLogger(MySQLMetadataReader.class);
+    public static boolean isTest;
 
     static {
-        logger.addAppender(logAppender);
+        if (logAppender != null) {
+            logger.addAppender(logAppender);
+        }
     }
 
     static {
@@ -38,43 +41,36 @@ public class MySQLMetadataReader extends SQLMetadataReader {
 
     public MySQLMetadataReader(ConnectionParameters parameters) {
         super(parameters);
-        String dbType = "MySQL";
-        String ipHost = "127.0.0.1";
-        String ipPort = "3306";
-        String dbName = "test";
-        String dbUser = "root";
-        String dbPassword = "root";
-        String dbTableName = "study";
-
-        parameters = new ConnectionParameters.Builder()
-                .addDbType(dbType)
-                .addIpHost(ipHost)
-                .addIpPort(ipPort)
-                .addDbName(dbName)
-                .addDbUser(dbUser)
-                .addDbPassword(dbPassword)
-                .addDbTableName(dbTableName)
-                .build();
-
-        closeOpenedConnection(connection);
-
         String url = String.format("jdbc:mysql://%s:%s/%s", parameters.getIpHost(), parameters.getIpPort(), parameters.getDbName());
         try {
             connection = DriverManager.getConnection(url, parameters.getDbUser(), parameters.getDbPassword());
         } catch (SQLException e) {
-            logger.error(String.format("Unable to connect to database '%s', user '%s', password '%s'",
-                    parameters.getDbName(), parameters.getDbUser(), parameters.getDbPassword()),
-                    e);
+            String message =
+                    String.format("Unable to connect to database '%s', user '%s', password '%s'",
+                            parameters.getDbName(), parameters.getDbUser(), parameters.getDbPassword());
+            if (!isTest) {
+                logger.error(message, e);
+            }
+            throw new RuntimeException(message, e);
+
         }
     }
 
-    private void closeOpenedConnection(final Connection connection) {
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                logger.error("Unable to close connection", e);
+    public void executeBatch(String query) {
+        String [] batchArray=query.split("[\n]");
+
+        try (Statement stmt = connection.createStatement();) {
+            for (String batch:batchArray
+                 ) {
+                stmt.addBatch(batch);
             }
+            stmt.executeBatch();
+        } catch (SQLException e) {
+            String message = String.format("It is not possible to update");
+            if (!isTest) {
+                logger.error(message, e);
+            }
+            throw new RuntimeException(message, e);
         }
     }
 
@@ -91,8 +87,10 @@ public class MySQLMetadataReader extends SQLMetadataReader {
         } catch (SQLException e) {
             String message = String.format("It is not possible to obtain the comment of table '%s' in " +
                     "database '%s'", parameters.getDbTableName(), parameters.getDbName());
-            logger.error(message, e);
-            throw new RuntimeException(message,e);
+            if (!isTest) {
+                logger.error(message, e);
+            }
+            throw new RuntimeException(message, e);
         }
     }
 
@@ -126,9 +124,11 @@ public class MySQLMetadataReader extends SQLMetadataReader {
         } catch (SQLException e) {
             String message = String.format("It is not possible to obtain columns of table '%s' in " +
                     "database '%s'", parameters.getDbTableName(), parameters.getDbName());
-            logger.error(message, e);
-            throw new RuntimeException(message,e);
+            if (!isTest) {
+                logger.error(message, e);
             }
+            throw new RuntimeException(message, e);
+        }
     }
 
     public List<String> getTableIndexesWithDescription() {
@@ -167,8 +167,10 @@ public class MySQLMetadataReader extends SQLMetadataReader {
         } catch (SQLException e) {
             String message = String.format("It is not possible to obtain indexes of table '%s' in " +
                     "database '%s'", parameters.getDbTableName(), parameters.getDbName());
-            logger.error(message, e);
-            throw new RuntimeException(message,e);
+            if (!isTest) {
+                logger.error(message, e);
+            }
+            throw new RuntimeException(message, e);
         }
     }
 
@@ -221,7 +223,7 @@ public class MySQLMetadataReader extends SQLMetadataReader {
             String message = String.format("It is not possible to obtain foreign keys of table '%s' in " +
                     "database '%s'", parameters.getDbTableName(), parameters.getDbName());
             logger.error(message, e);
-            throw new RuntimeException(message,e);
+            throw new RuntimeException(message, e);
         }
 
     }
@@ -233,49 +235,54 @@ public class MySQLMetadataReader extends SQLMetadataReader {
         } catch (SQLException e) {
             String message = String.format("It is not possible to close connection");
             logger.error(message, e);
-            throw new RuntimeException(message,e);
+            throw new RuntimeException(message, e);
         }
+    }
+
+    public String queryDropTables() {
+        return "DROP TABLE IF exists `test`.`study`;\n" +
+                "DROP TABLE IF exists `test`.`course`;\n" +
+                "DROP TABLE IF exists `test`.`students`;\n";
     }
 
     public String queryCreateTables() {
 
-        return "CREATE TABLE `test`.`students` (\n" +
-                "  `student_id` INT NOT NULL,\n" +
-                "  `student_name` VARCHAR(45) NULL,\n" +
-                "  `student age` INT(11) NULL,\n" +
-                "  PRIMARY KEY (`student_id`),\n" +
-                "  INDEX `student_age` (`student age` DESC),\n" +
-                "  INDEX `student_name` (`student_name` ASC),\n" +
-                "  INDEX `student_name_age` (`student age` ASC, `student_name` DESC))\n" +
-                "COMMENT = 'Table for students';\n" +
+        return  "CREATE TABLE `test`.`students` (" +
+                "  `student_id` INT NOT NULL," +
+                "  `student_name` VARCHAR(45) NULL," +
+                "  `student age` INT(11) NULL," +
+                "  PRIMARY KEY (`student_id`)," +
+                "  INDEX `student_age` (`student age` DESC)," +
+                "  INDEX `student_name` (`student_name` ASC)," +
+                "  INDEX `student_name_age` (`student age` ASC, `student_name` DESC))" +
+                "COMMENT = 'Table for students';" +
                 "\n" +
-                "CREATE TABLE `test`.`course` (\n" +
-                "  `course_id` INT NOT NULL,\n" +
-                "  `course_name` VARCHAR(45) NULL,\n" +
-                "  `course_duration` INT(11) NULL,\n" +
-                "  PRIMARY KEY (`course_id`),\n" +
-                "  INDEX `course_name` (`course_name` ASC),\n" +
-                "  INDEX `course_name_duration` (`course_name` ASC, `course_duration` DESC))\n" +
-                "COMMENT = 'Table for cources';\n" +
+                "CREATE TABLE `test`.`course` (" +
+                "  `course_id` INT NOT NULL," +
+                "  `course_name` VARCHAR(45) NULL," +
+                "  `course_duration` INT(11) NULL," +
+                "  PRIMARY KEY (`course_id`)," +
+                "  INDEX `course_name` (`course_name` ASC)," +
+                "  INDEX `course_name_duration` (`course_name` ASC, `course_duration` DESC))" +
+                "COMMENT = 'Table for cources';" +
                 "\n" +
-                "\n" +
-                "CREATE TABLE `test`.`study` (\n" +
-                "  `study_id` INT NOT NULL,\n" +
-                "  `student_id` INT(11) NOT NULL DEFAULT 1,\n" +
-                "  `course_id` INT(11) NOT NULL DEFAULT 1,\n" +
-                "  PRIMARY KEY (`study_id`),\n" +
-                "  INDEX `idx_course_student` (`student_id` ASC, `course_id` ASC),\n" +
-                "  INDEX `fk_course_id_idx` (`course_id` ASC),\n" +
-                "  CONSTRAINT `fk_student_id`\n" +
-                "    FOREIGN KEY (`student_id`)\n" +
-                "    REFERENCES `test`.`students` (`student_id`)\n" +
-                "    ON DELETE NO ACTION\n" +
-                "    ON UPDATE NO ACTION,\n" +
-                "  CONSTRAINT `fk_course_id`\n" +
-                "    FOREIGN KEY (`course_id`)\n" +
-                "    REFERENCES `test`.`course` (`course_id`)\n" +
-                "    ON DELETE NO ACTION\n" +
-                "    ON UPDATE NO ACTION)\n" +
+                "CREATE TABLE `test`.`study` (" +
+                "  `study_id` INT NOT NULL," +
+                "  `student_id` INT(11) NOT NULL DEFAULT 1," +
+                "  `course_id` INT(11) NOT NULL DEFAULT 1," +
+                "  PRIMARY KEY (`study_id`)," +
+                "  INDEX `idx_course_student` (`student_id` ASC, `course_id` ASC)," +
+                "  INDEX `fk_course_id_idx` (`course_id` ASC)," +
+                "  CONSTRAINT `fk_student_id`" +
+                "    FOREIGN KEY (`student_id`)" +
+                "    REFERENCES `test`.`students` (`student_id`)" +
+                "    ON DELETE NO ACTION" +
+                "    ON UPDATE NO ACTION," +
+                "  CONSTRAINT `fk_course_id`" +
+                "    FOREIGN KEY (`course_id`)" +
+                "    REFERENCES `test`.`course` (`course_id`)" +
+                "    ON DELETE NO ACTION" +
+                "    ON UPDATE NO ACTION)" +
                 "COMMENT = 'Table for study';\n";
     }
 }
