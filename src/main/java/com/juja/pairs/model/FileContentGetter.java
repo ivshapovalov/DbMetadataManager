@@ -2,9 +2,6 @@ package com.juja.pairs.model;
 
 import java.io.*;
 
-/**
- * Created by ВаНо on 27.10.2016.
- */
 public class FileContentGetter {
 
     /* before fetching this method make sure that
