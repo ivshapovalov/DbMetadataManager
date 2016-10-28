@@ -1,0 +1,7 @@
+PostgreSql
+localhost
+5432
+sqlcmd
+postgres
+1111111
+fade

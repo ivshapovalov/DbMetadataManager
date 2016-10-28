@@ -1,5 +1,8 @@
 package com.juja.pairs.model;
 
+import com.juja.pairs.view.FileView;
+import com.juja.pairs.view.View;
+
 public class ConnectionParameters {
     private String dbType;
     private String ipHost;
@@ -10,7 +13,8 @@ public class ConnectionParameters {
     private String dbTableName;
 
     public static ConnectionParameters parseFromFile(String fileName) {
-        String fileContent = FileContentGetter.getContent(fileName);
+        View view = new FileView(fileName);
+        String fileContent = view.read();
         String [] paramArray = fileContent.split("\\n");
         //TODO check amount of parameters
         String dbType = paramArray[0];
